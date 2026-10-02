@@ -10,7 +10,7 @@ you asked for — there is nothing to build or run.
 ## Install
 
 ```bash
-git clone <this repo> ~/src/revial-claude-skills
+git clone https://github.com/janecake/revial-claude-skills.git ~/src/revial-claude-skills
 cd ~/src/revial-claude-skills
 ./install.sh
 ```
