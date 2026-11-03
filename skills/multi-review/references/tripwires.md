@@ -125,6 +125,12 @@ Dev Supabase has drifted from production — it has columns production lacks, an
 `gen:types` commits them into `database.types.ts`. A type existing is not proof
 the column exists in production.
 
+**Not a finding: migration number collisions.** With several PRs open at once,
+unmerged PRs routinely claim the same Drizzle migration number (or the same
+`meta/_journal.json` index) as each other or as something that landed on the
+base since the branch was cut. The author renumbers when the PR merges. Never
+raise it, at any severity, and never mention it in the summary.
+
 ## 11. AI provider
 
 Requesty is the only router (`REQUESTY_API_KEY`, `REQUESTY_BASE_URL`). There is

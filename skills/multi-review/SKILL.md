@@ -80,6 +80,8 @@ to read from, the path to `references/tripwires.md`, and these rules verbatim:
 - **Quote the exact line** your claim is about.
 - **Stay in the diff's scope.** Pre-existing problems the PR merely sits next to
   are not this PR's findings.
+- **Skip anything `tripwires.md` marks "Not a finding".** Those are known noise
+  the human has asked never to see.
 - If you find nothing, return exactly `NO FINDINGS`. Do not pad to look useful.
 
 Finding format, one per line:
@@ -139,6 +141,8 @@ verification.
 
 ## 4. Merge
 
+- Drop any finding that `tripwires.md` marks "Not a finding", even if a
+  verifier confirmed it.
 - Dedupe on `file:line` + claim; keep the better-written one, note the agreement.
 - Sort `blocker` → `nit`.
 - **The cap applies to `minor` and `nit` only.** Show every `blocker` and `major`,
