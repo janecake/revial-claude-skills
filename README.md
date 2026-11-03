@@ -72,7 +72,9 @@ create a PR
 
 Pushes the branch, opens a PR against `dev`, runs `multi-review` and re-reviews
 the fixes. It then runs the built-in `/code-review` over whatever is left, and
-checks CI before it reports anything as green.
+checks CI before it reports anything as green. It writes the PR body, commit
+messages and its report in the same unslop style as `multi-review`, and it drops
+any finding that `tripwires.md` marks "Not a finding".
 
 ### `pr-stack-announce`
 
@@ -111,8 +113,8 @@ those, and the merge step drops any that get through.
 ## Writing rules
 
 `skills/multi-review/references/unslop.md` is a copy of the rules in the `unslop`
-skill, which lives outside this repo. If you change a rule in one place, copy the
-change to the other.
+skill, which lives outside this repo. `multi-review` and `pr-review-loop` both
+follow it. If you change a rule in one place, copy the change to the other.
 
 ## Conventions these skills enforce
 
