@@ -1,11 +1,11 @@
 # Revial Claude Code skills
 
-Three Claude Code skills for the PR workflow on [`revial-sst`](https://github.com/Revial-ai/revial-sst):
-open a PR, review it with a fan-out of specialist agents, and announce a stack of
-PRs in Slack.
+Three Claude Code skills for the PR workflow on [`revial-sst`](https://github.com/Revial-ai/revial-sst).
+One opens a PR, one reviews it with specialist agents running in parallel, and
+one writes a Slack post that announces a stack of PRs.
 
-They are plain Markdown. Claude reads a skill when its description matches what
-you asked for — there is nothing to build or run.
+The skills are plain Markdown. Claude reads a skill when its description matches
+your request, so there is nothing to build or run.
 
 ## Install
 
@@ -16,85 +16,106 @@ cd ~/src/revial-claude-skills
 ```
 
 `install.sh` symlinks each skill into `~/.claude/skills/`, so a `git pull` here
-updates what Claude uses. Anything already at that path is moved aside to
-`~/.claude/skills/.backup-<timestamp>/` first — nothing is overwritten.
+updates what Claude uses. If something already exists at that path, the script
+moves it to `~/.claude/skills/.backup-<timestamp>/` first and overwrites nothing.
 
-Pass `--copy` instead if you'd rather have independent copies you can edit
-without touching the repo.
+Pass `--copy` to install independent copies that you can edit without touching
+the repo.
 
-Verify with `/multi-review` in Claude Code — it should be listed.
+To check the install, type `/multi-review` in Claude Code. It should appear in the
+list.
 
 ## The skills
 
-### `multi-review` — review a PR with parallel agents
+### `multi-review`
 
 ```
 /multi-review 2847
 ```
 
-Fans out seven specialist reviewers over the diff (correctness, edge cases,
-security and tenancy, conventions, data and migrations, tests and verification,
-infra and queues), then **adversarially verifies every finding** against the real
-file with a second agent before you see it. Refuted findings are dropped.
+Seven specialist reviewers read the diff in parallel. They cover correctness,
+edge cases, security and tenancy, conventions, data and migrations, tests and
+verification, and infra and queues. For every finding, a second agent reads the
+real file and tries to disprove it. The skill drops each finding that agent
+refutes.
 
-Then it stops, shows you what survived, and asks what to keep and what verdict to
-post. **It never posts anything without that answer.**
+Then the skill stops, shows you the findings that survived, and asks which to
+keep and which verdict to post. It posts nothing until you answer.
 
-Two things make this different from a single reviewer reading a diff:
+It differs from a single reviewer reading a diff in two ways.
 
-- **Verification.** An agent that is wrong is usually confident, so self-reported
-  confidence is worthless. Each surviving finding gets a fresh agent whose only
-  job is to disprove it. This is the step that decides whether the author trusts
-  the next review you send them.
+- **Verification.** An agent that is wrong is usually confident, so its own
+  confidence tells you nothing. Each surviving finding gets a fresh agent whose
+  only job is to disprove it. That step decides whether the author trusts your
+  next review.
 - **Repo knowledge.** The reviewers load
-  [`skills/multi-review/references/tripwires.md`](skills/multi-review/references/tripwires.md)
-  — twelve things that have actually shipped broken in this codebase, with the
-  diff pattern that gives each one away. RLS silently lost in a Supabase→Drizzle
-  port, an SQS subscription missing `partialResponses` so failures vanish instead
-  of reaching a DLQ, a classification rule changed without its fixture row.
+  [`skills/multi-review/references/tripwires.md`](skills/multi-review/references/tripwires.md),
+  a list of twelve things that have shipped broken in this codebase. Each entry
+  names the diff pattern that gives it away. Examples include RLS lost in a
+  Supabase-to-Drizzle port, an SQS subscription missing `partialResponses` so
+  failed jobs vanish instead of reaching a DLQ, and a classification rule changed
+  without its fixture row.
 
-Expect 10–20 agents on a normal PR. For a two-line diff, Claude should skip the
-fan-out and just read it.
+The skill's chat messages, findings table, review body and inline comments follow
+[`skills/multi-review/references/unslop.md`](skills/multi-review/references/unslop.md).
+Those rules ban em dashes and bold emphasis, and they ask for active voice and
+plain words.
 
-### `pr-review-loop` — branch to reviewed PR
+Expect 10 to 20 agents on a normal PR. For a two-line diff, Claude skips the
+fan-out and reads the diff itself.
+
+### `pr-review-loop`
 
 ```
 create a PR
 ```
 
-Pushes the branch, opens it against `dev`, runs `multi-review`, re-reviews the
-fixes, then runs the built-in `/code-review` over whatever is left, and checks CI
-before claiming anything is green.
+Pushes the branch, opens a PR against `dev`, runs `multi-review` and re-reviews
+the fixes. It then runs the built-in `/code-review` over whatever is left, and
+checks CI before it reports anything as green.
 
-### `pr-stack-announce` — Slack post for a stacked chain
+### `pr-stack-announce`
 
 ```
 announce this stack
 ```
 
-Works out the real parent of each branch (PR base fields go stale after a
-rebase), counts *reviewable* lines excluding generated files — a PR can show
-24,000 lines and contain 300 real ones — and writes a review-order message in
-Slack's markdown. It prints the text; you post it.
+Works out the real parent of each branch, since PR base fields go stale after a
+rebase. It counts reviewable lines and leaves out generated files, because a PR
+can show 24,000 lines and contain 300 that need review. Then it writes a message
+in Slack's markdown that gives the review order. It prints the text, and you post
+it.
 
 ## Adapting this to another codebase
 
-Replace `skills/multi-review/references/tripwires.md`. That file is the only
-Revial-specific content; `SKILL.md` carries none, and the `conventions` reviewer
-reads the target repo's `CLAUDE.md` fresh each run so it can't go stale.
+Start by replacing `skills/multi-review/references/tripwires.md`, which holds most
+of the Revial-specific content. The reviewer table in `skills/multi-review/SKILL.md`
+also names a few Revial checks, such as RLS on Drizzle ports and replay-registry
+classes, so edit those rows too. The `conventions` reviewer reads the target
+repo's `CLAUDE.md` fresh on each run, so it never goes stale.
 
-`pr-review-loop` assumes a `dev` base branch and `pr-stack-announce` excludes
-Drizzle snapshot paths — both one-line changes.
+`pr-review-loop` assumes a `dev` base branch, and `pr-stack-announce` excludes
+Drizzle snapshot paths. Each is a one-line change.
 
-## Keeping the tripwires alive
+## Keeping the tripwires current
 
-The file is only worth its length if it grows when something bites. When a bug
-reaches production and the review missed it, add the entry: what broke, the diff
-pattern that would have caught it, and the severity. An entry nobody could act on
-from a diff doesn't belong there.
+The file is worth its length only if it grows when a bug gets through. When a bug
+that the review missed reaches production, add an entry with what broke, the diff
+pattern that would have caught it, and the severity. If nobody could act on an
+entry from a diff alone, it doesn't belong there.
+
+Noise goes in the same file. When reviews keep raising something you never want
+to see, add a "Not a finding" paragraph to the relevant section. Reviewers skip
+those, and the merge step drops any that get through.
+
+## Writing rules
+
+`skills/multi-review/references/unslop.md` is a copy of the rules in the `unslop`
+skill, which lives outside this repo. If you change a rule in one place, copy the
+change to the other.
 
 ## Conventions these skills enforce
 
 The authority is [`CLAUDE.md`](https://github.com/Revial-ai/revial-sst/blob/dev/CLAUDE.md)
-in `revial-sst`, not this repo. `tripwires.md` explains *why* a rule exists and
-how to spot a violation — it deliberately does not restate the rules.
+in `revial-sst`, not this repo. `tripwires.md` explains why each rule exists and
+how to spot a violation. It doesn't restate the rules.

@@ -1,23 +1,34 @@
 ---
 name: multi-review
 description: >-
-  Multi-agent PR review. Fans out specialist reviewers over a PR diff, has every
-  finding adversarially verified against the real file, merges what survives,
-  shows it to the human for approval, then posts the review. Use when the user
-  says "multi-review", "review this PR with agents", or "/multi-review <pr>".
+  Multi-agent PR review. Specialist reviewers read a PR diff in parallel, a
+  second agent tries to disprove every finding against the real file, and the
+  human approves what survives before the skill posts the review. Use when the
+  user says "multi-review", "review this PR with agents", or "/multi-review <pr>".
 ---
 
 # multi-review
 
-Review a PR with parallel specialist agents. Two hard rules:
+Review a PR with parallel specialist agents. Two rules hold on every run:
 
-1. **Nothing is posted without explicit human approval.**
-2. **No finding reaches the human until a second agent has confirmed it against
-   the real file.** Reviewers are confidently wrong often enough that an
-   unverified list wastes the author's time and trains them to ignore you.
+1. Post nothing until the human has approved it.
+2. Show the human no finding until a second agent has confirmed it against the
+   real file. Reviewers are often confident and wrong. An unverified list wastes
+   the author's time and teaches them to ignore your reviews.
 
-Repo-specific checks live in [`references/tripwires.md`](references/tripwires.md).
-Reviewers load it; this file stays generic.
+Repo-specific checks live in [`references/tripwires.md`](references/tripwires.md),
+and reviewers load it.
+
+## Writing
+
+Everything the skill writes follows [`references/unslop.md`](references/unslop.md).
+That covers your messages to the human while you work, the findings table, the
+review body, inline comments and the re-review report. Read the file before you
+send the first message of the run. Reviewers and verifiers follow it too, because
+their claims become comment text.
+
+There are two exceptions. Quoted material stays as written, which includes lines
+of code, log output and the PR author's words. Code identifiers stay as they are.
 
 ## 0. Preflight
 
@@ -27,22 +38,23 @@ gh pr checks <pr>
 ```
 
 **CI first.** If checks are red, say so before anything else. A review that ends
-in `--approve` over a failing build is a bad review regardless of the findings.
-Report the failing check names at the human gate; don't block the review on them.
+in `--approve` over a failing build is a bad review whatever the findings say.
+Report the failing check names at the human gate, and don't block the review on
+them.
 
-**Get the right code on disk.** Subagents share your working directory, so if the
-tree isn't at the PR head they will read stale code and invent findings. Compare
+**Get the right code on disk.** Subagents share your working directory. If the
+tree isn't at the PR head, they read stale code and invent findings. Compare
 `git rev-parse --abbrev-ref HEAD` to `headRefName`. If they differ, make a
-worktree and give every agent *that* path explicitly:
+worktree and give every agent its path:
 
 ```bash
 git fetch origin "pull/<pr>/head:pr-<pr>"
 git worktree add "<scratchpad>/pr-<pr>" "pr-<pr>"
 ```
 
-Reviewers only read, so the worktree needs no `npm install` — and never symlink
-`node_modules` into it, that makes `@revial-sst/*` resolve to the main checkout.
-Remove the worktree when done (`git worktree remove`).
+Reviewers only read, so the worktree needs no `npm install`. Never symlink
+`node_modules` into it, because then workspace packages resolve to the main
+checkout. Remove the worktree with `git worktree remove` when you are done.
 
 ## 1. Scope
 
@@ -51,38 +63,42 @@ gh pr diff <pr> > "<scratchpad>/pr.diff"
 gh pr diff <pr> --name-only > "<scratchpad>/files.txt"
 ```
 
-**Large PRs.** Over ~2000 diff lines or ~40 files, do not hand every reviewer the
-whole diff — a reviewer whose context is full stops reading and starts
-pattern-matching. Split `files.txt` by directory into coherent chunks and give
-each reviewer its chunk plus the full file list for orientation. Say in the final
-report that the PR was chunked.
+**Large PRs.** Over about 2000 diff lines or 40 files, don't hand every reviewer
+the whole diff. A reviewer with a full context stops reading and starts
+pattern-matching. Split `files.txt` by directory into chunks that belong
+together, and give each reviewer its chunk plus the full file list. Say in the
+final report that you split the PR.
 
-Exclude generated files from reviewer attention: lockfiles, `*/migrations/meta/*`
-(Drizzle snapshots), `database.types.ts`, build output. Name them as excluded
-rather than silently dropping them.
+Keep generated files away from reviewers. These are lockfiles, Drizzle snapshots
+under `*/migrations/meta/*`, `database.types.ts` and build output. List the files
+you excluded instead of dropping them without a word.
 
 ## 2. Fan out reviewers
 
-Spawn all reviewers in ONE message so they run concurrently
-(`subagent_type: general-purpose`).
+Spawn all reviewers in one message so they run concurrently, with
+`subagent_type: general-purpose`.
 
-Every agent gets: the PR number, the path to `pr.diff`, the path to the checkout
-to read from, the path to `references/tripwires.md`, and these rules verbatim:
+Every agent gets the PR number, the path to `pr.diff`, the checkout path to read
+from, the paths to `references/tripwires.md` and `references/unslop.md`, and
+these rules verbatim:
 
-- **Do not modify any file.** You are reading only. (A read-only agent type still
-  has Bash — this has to be said.)
-- **Return findings only.** No PR summary, no description of what the code does,
-  no praise, no "overall this looks good". Those are tokens the human then has to
-  skim past.
-- **Read the full file around every hunk before claiming anything.** A diff hunk
-  is not enough context to call a bug — the guard you think is missing is often
-  six lines above the hunk.
-- **Quote the exact line** your claim is about.
-- **Stay in the diff's scope.** Pre-existing problems the PR merely sits next to
-  are not this PR's findings.
-- **Skip anything `tripwires.md` marks "Not a finding".** Those are known noise
-  the human has asked never to see.
-- If you find nothing, return exactly `NO FINDINGS`. Do not pad to look useful.
+- **Do not modify any file.** You only read. A read-only agent type still has
+  Bash, so this has to be said.
+- **Return findings only.** Leave out a PR summary, a description of what the
+  code does, praise, and "overall this looks good". The human has to skim past
+  every one of those words.
+- **Read the full file around every hunk before you claim anything.** A diff hunk
+  doesn't give enough context to call a bug. The guard you think is missing is
+  often six lines above the hunk.
+- **Quote the line your claim is about.**
+- **Stay in the diff's scope.** A problem in code the PR doesn't change is not
+  this PR's finding.
+- **Skip anything `tripwires.md` marks "Not a finding".** The human has asked
+  never to see those.
+- **Write the claim, the reason and the fix in the style of `unslop.md`.** They
+  become review comment text.
+- If you find nothing, return exactly `NO FINDINGS`. Don't pad the list to look
+  useful.
 
 Finding format, one per line:
 
@@ -90,86 +106,91 @@ Finding format, one per line:
 SEVERITY | file:line | one-line claim | why it breaks | suggested fix
 ```
 
-Severity ladder — give agents this definition, or `blocker` inflates:
+Give agents this severity ladder, or they inflate `blocker`:
 
 | Severity | Means |
 |---|---|
-| `blocker` | Breaks production, loses or corrupts data, or leaks data across teams/tenants |
+| `blocker` | Breaks production, loses or corrupts data, or leaks data across teams or tenants |
 | `major` | Wrong behaviour on a realistic input, with no workaround |
-| `minor` | Correct today but fragile, or violates a stated repo rule |
+| `minor` | Correct today but fragile, or breaks a stated repo rule |
 | `nit` | Naming, style, comment wording |
 
 ### The reviewers
 
 | Agent | Looks for |
 |---|---|
-| `correctness` | Logic bugs, inverted or wrong conditions, off-by-one, broken control flow, unhandled promise rejections, `catch` blocks that swallow, early returns that skip cleanup |
-| `edge-cases` | Null/empty/huge inputs, races and concurrent writes, retry and idempotency, partial failure, timezone and locale, non-ASCII text (JS `\b` never fires after `ä`/`ö`) |
-| `security-and-tenancy` | Authz on every new API route, team/tenant isolation, **RLS preserved on any Supabase→Drizzle port**, injection, SSRF, XSS, unsafe embeds, secret leakage into logs or client bundles |
-| `conventions` | Read the target repo's `CLAUDE.md` fresh, plus `tripwires.md`. Also accidental files (`foo 2.ts`, editor backups), stray scripts, committed secrets, debug logging left in |
-| `data-and-migrations` | Migration safety (destructive, irreversible, lock risk on a large table), schema-vs-model drift, whether existing rows are backfilled, new tables that need a replay-registry class |
-| `tests-and-verification` | Whether the PR's claimed verification actually holds: is there an automated test, does it call production code or re-implement it, is it vacuous (asserting only what a mock was told to return), does any new `scripts/` file clear the bar in `CLAUDE.md`, do rules changes carry their fixture rows |
-| `infra-and-queues` | New queue or subscription wired with `partialResponses` and a DLQ, alarms, cron schedule overlap, secrets linked, correct `Resource.*` usage, VPC/arch settings consistent with the rest |
+| `correctness` | Logic bugs, inverted or wrong conditions, off-by-one errors, broken control flow, unhandled promise rejections, `catch` blocks that swallow errors, early returns that skip cleanup |
+| `edge-cases` | Null, empty and huge inputs, races and concurrent writes, retries and idempotency, partial failure, timezone and locale, non-ASCII text. JS `\b` never fires after `ä` or `ö`. |
+| `security-and-tenancy` | Authz on every new API route, team and tenant isolation, RLS kept on any Supabase-to-Drizzle port, injection, SSRF, XSS, unsafe embeds, secrets leaking into logs or client bundles |
+| `conventions` | Reads the target repo's `CLAUDE.md` fresh, plus `tripwires.md`. Also accidental files such as `foo 2.ts` and editor backups, stray scripts, committed secrets, leftover debug logging |
+| `data-and-migrations` | Destructive or irreversible migrations, lock risk on a large table, drift between schema and model, whether existing rows get a backfill, new tables that need a replay-registry class |
+| `tests-and-verification` | Whether the PR's claimed verification holds. Is there an automated test? Does it call production code or re-implement it? Does it assert only what a mock was told to return? Does any new `scripts/` file clear the bar in `CLAUDE.md`? Do rules changes carry their fixture rows? |
+| `infra-and-queues` | New queues or subscriptions wired with `partialResponses` and a DLQ, alarms, cron schedule overlap, linked secrets, correct `Resource.*` usage, VPC and arch settings that match the rest |
 
-Drop an agent whose domain the PR doesn't touch — a pure-frontend PR needs no
-`infra-and-queues`. Say which you dropped and why.
+Drop an agent whose domain the PR doesn't touch. A pure-frontend PR needs no
+`infra-and-queues`. Say which agents you dropped and why.
 
 ## 3. Verify every finding
 
-This is the step that decides whether the review is worth reading.
+This step decides whether the review is worth reading.
 
-For each finding of `minor` or above, spawn one verifier whose **only** job is to
-try to disprove it. Fan out in one message per batch.
+For each finding of `minor` or above, spawn one verifier whose only job is to try
+to disprove it. Spawn each batch in one message.
 
 Each verifier gets the single finding and these rules:
 
 - Read the full file at head, and the callers if the claim depends on them.
 - Return exactly one of:
-  - `CONFIRMED` — quote the lines that prove it.
-  - `REFUTED` — say precisely what the reviewer missed.
-  - `UNPROVABLE` — the claim needs runtime or external knowledge the code doesn't settle.
-- **Do not introduce new findings.** Anything else you notice goes on a separate
-  `incidental:` line and will be discarded.
+  - `CONFIRMED`, quoting the lines that prove it.
+  - `REFUTED`, saying exactly what the reviewer missed.
+  - `UNPROVABLE`, when the claim needs runtime or external knowledge that the
+    code doesn't settle.
+- **Do not introduce new findings.** Put anything else you notice on a separate
+  `incidental:` line. The merge step discards it.
 
-Then: drop every `REFUTED`. Keep `UNPROVABLE` only at `blocker`/`major`, labelled
-`[unverified]` so the human can weigh it. `nit`s skip verification — and a `nit`
+Then drop every `REFUTED`. Keep `UNPROVABLE` only at `blocker` or `major`, and
+label it `[unverified]` so the human can weigh it. A `nit` skips verification and
 never justifies request-changes.
 
-Two agents independently reporting the same thing is *weak* corroboration, not
-strong: they read the same diff with similar priors. It does not substitute for
-verification.
+Two agents reporting the same thing is weak corroboration. They read the same
+diff with similar priors, so their agreement doesn't replace verification.
 
 ## 4. Merge
 
-- Drop any finding that `tripwires.md` marks "Not a finding", even if a
-  verifier confirmed it.
-- Dedupe on `file:line` + claim; keep the better-written one, note the agreement.
-- Sort `blocker` → `nit`.
-- **The cap applies to `minor` and `nit` only.** Show every `blocker` and `major`,
-  however many there are. Fold minors/nits to ~10 and state how many were folded.
+- Drop any finding that `tripwires.md` marks "Not a finding", even if a verifier
+  confirmed it.
+- Dedupe on `file:line` plus claim. Keep the better-written one and note that two
+  reviewers agreed.
+- Sort from `blocker` to `nit`.
+- The cap applies to `minor` and `nit` only. Show every `blocker` and `major`,
+  however many there are. Fold minors and nits to about 10 and state how many you
+  folded.
 - If every reviewer returned `NO FINDINGS`, say exactly that and go to the gate
-  recommending approve. Do not manufacture a finding to justify the run.
+  recommending approve. Don't invent a finding to justify the run.
+- Check every claim, reason and fix against `unslop.md`, and rewrite the ones that
+  break a rule. Leave quoted code as it is.
 
-## 5. Human gate (mandatory)
+## 5. Human gate
 
-Present in chat:
+This step is mandatory. Present in chat:
 
 - CI status, stated first.
 - A numbered table: `# | severity | file:line | claim | suggested fix`.
-- How many minors/nits were folded, and which reviewers were dropped.
+- How many minors and nits you folded, and which reviewers you dropped.
 
-Then **STOP** and ask:
+Then stop and ask:
 
 - which findings to keep
-- the verdict — comment / request-changes / approve
+- the verdict, which is comment, request-changes or approve
 
-Use `AskUserQuestion` for the verdict. **Do not call `gh pr review` or `gh api`
-before that answer exists.**
+Use `AskUserQuestion` for the verdict. Don't call `gh pr review` or `gh api`
+until you have the answer.
 
 ## 6. Post
 
-Write the body to `<scratchpad>/review.md`. Prefer inline anchoring — a finding
-shown at its line gets fixed, a finding in a wall of text gets skimmed.
+Write the body to `<scratchpad>/review.md` in the style of `unslop.md`. Anchor
+findings inline where you can. An author fixes a finding shown at its line and
+skims one buried in a long body.
 
 ```bash
 # <scratchpad>/review.json
@@ -184,32 +205,32 @@ gh api "repos/<owner>/<repo>/pulls/<pr>/reviews" --method POST \
   --input "<scratchpad>/review.json"
 ```
 
-**Caveat:** an inline comment must target a line present in the PR's diff. The
-whole call fails if one doesn't, so put any finding outside the diff in `body`
-instead. If the inline call fails, fall back to:
+**Inline comments must target diff lines.** One comment on a line outside the
+PR's diff fails the whole call, so put any such finding in `body`. If the inline
+call fails anyway, fall back to:
 
 ```bash
 gh pr review <pr> --comment --body-file "<scratchpad>/review.md"
 ```
 
-Confirm the review URL back to the user.
+Give the user the review URL.
 
 ## 7. Re-review the fixes
 
-Once fixes are pushed, check them — a fix written against a finding is not a fix
-verified against the code.
+Once the author pushes fixes, check each one against the code. A fix that
+answers a finding can still be wrong.
 
 ```bash
 git log --oneline <sha-at-review-time>..HEAD
 gh pr diff <pr>
 ```
 
-One agent, two questions per fix: does it actually resolve the finding, and does
-it introduce anything new? Report both. This is cheap and catches the bad fix
-that the original review implicitly asked for.
+One agent answers two questions per fix. Does it resolve the finding? Does it
+introduce anything new? Report both answers. This step is cheap, and it catches a
+bad fix that the original review asked for without meaning to.
 
 ## Cost
 
-Roughly 7 reviewers plus one verifier per finding. On a typical PR that's
-10–20 agents. For a two-line diff, skip the fan-out and review it yourself —
-say that's what you did.
+A run uses about 7 reviewers plus one verifier per finding, which comes to 10 to
+20 agents on a typical PR. For a two-line diff, skip the fan-out, review it
+yourself, and say that you did.
