@@ -17,7 +17,9 @@ Review a PR with parallel specialist agents. Two rules hold on every run:
    the author's time and teaches them to ignore your reviews.
 
 Repo-specific checks live in [`references/tripwires.md`](references/tripwires.md),
-and reviewers load it.
+and reviewers load it. Its "Never raise" section lists topics the human never
+wants to see. Read that section yourself before the run, and apply it at every
+step below, including your own messages.
 
 ## Writing
 
@@ -40,7 +42,8 @@ gh pr checks <pr>
 **CI first.** If checks are red, say so before anything else. A review that ends
 in `--approve` over a failing build is a bad review whatever the findings say.
 Report the failing check names at the human gate, and don't block the review on
-them.
+them. The same goes for `mergeable`, except where the "Never raise" list in
+`tripwires.md` covers the cause: then leave it out.
 
 **Get the right code on disk.** Subagents share your working directory. If the
 tree isn't at the PR head, they read stale code and invent findings. Compare
@@ -93,8 +96,10 @@ these rules verbatim:
 - **Quote the line your claim is about.**
 - **Stay in the diff's scope.** A problem in code the PR doesn't change is not
   this PR's finding.
-- **Skip anything `tripwires.md` marks "Not a finding".** The human has asked
-  never to see those.
+- **Never raise anything on the "Never raise" list at the top of `tripwires.md`.**
+  Read that list before the diff. It covers a topic in any wording and at any
+  severity, so don't rephrase one of its items into a finding, a question or a
+  nit.
 - **Write the claim, the reason and the fix in the style of `unslop.md`.** They
   become review comment text.
 - If you find nothing, return exactly `NO FINDINGS`. Don't pad the list to look
@@ -123,7 +128,7 @@ Give agents this severity ladder, or they inflate `blocker`:
 | `edge-cases` | Null, empty and huge inputs, races and concurrent writes, retries and idempotency, partial failure, timezone and locale, non-ASCII text. JS `\b` never fires after `ä` or `ö`. |
 | `security-and-tenancy` | Authz on every new API route, team and tenant isolation, RLS kept on any Supabase-to-Drizzle port, injection, SSRF, XSS, unsafe embeds, secrets leaking into logs or client bundles |
 | `conventions` | Reads the target repo's `CLAUDE.md` fresh, plus `tripwires.md`. Also accidental files such as `foo 2.ts` and editor backups, stray scripts, committed secrets, leftover debug logging |
-| `data-and-migrations` | Destructive or irreversible migrations, lock risk on a large table, drift between schema and model, whether existing rows get a backfill, new tables that need a replay-registry class |
+| `data-and-migrations` | Destructive or irreversible migrations, lock risk on a large table, drift between schema and model, whether existing rows get a backfill, new tables that need a replay-registry class. What the SQL does, never where the migration sits in the sequence: numbering, journal and snapshot order are on the "Never raise" list |
 | `tests-and-verification` | Whether the PR's claimed verification holds. Is there an automated test? Does it call production code or re-implement it? Does it assert only what a mock was told to return? Does any new `scripts/` file clear the bar in `CLAUDE.md`? Do rules changes carry their fixture rows? |
 | `infra-and-queues` | New queues or subscriptions wired with `partialResponses` and a DLQ, alarms, cron schedule overlap, linked secrets, correct `Resource.*` usage, VPC and arch settings that match the rest |
 
@@ -147,6 +152,8 @@ Each verifier gets the single finding and these rules:
     code doesn't settle.
 - **Do not introduce new findings.** Put anything else you notice on a separate
   `incidental:` line. The merge step discards it.
+- If the finding is about a topic on the "Never raise" list in `tripwires.md`,
+  return `REFUTED: never raise` without checking the code.
 
 Then drop every `REFUTED`. Keep `UNPROVABLE` only at `blocker` or `major`, and
 label it `[unverified]` so the human can weigh it. A `nit` skips verification and
@@ -157,8 +164,10 @@ diff with similar priors, so their agreement doesn't replace verification.
 
 ## 4. Merge
 
-- Drop any finding that `tripwires.md` marks "Not a finding", even if a verifier
-  confirmed it.
+- Check every surviving finding against the "Never raise" list in
+  `tripwires.md` and drop each one that touches a listed topic, even if a
+  verifier confirmed it. Do this as its own pass before the gate. Don't count
+  these as folded or mention them anywhere.
 - Dedupe on `file:line` plus claim. Keep the better-written one and note that two
   reviewers agreed.
 - Sort from `blocker` to `nit`.
@@ -226,7 +235,8 @@ gh pr diff <pr>
 ```
 
 One agent answers two questions per fix. Does it resolve the finding? Does it
-introduce anything new? Report both answers. This step is cheap, and it catches a
+introduce anything new? Report both answers. The "Never raise" list applies here
+too. This step is cheap, and it catches a
 bad fix that the original review asked for without meaning to.
 
 ## Cost

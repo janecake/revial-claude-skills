@@ -12,6 +12,32 @@ violation. It doesn't copy the rules.
 
 ---
 
+## Never raise
+
+The human has asked never to see these. Drop them at every step: reviewer,
+verifier, merge, the preflight summary and the re-review. A verifier's
+`CONFIRMED` doesn't save one, and neither does severity. Don't mention that you
+dropped them, and don't raise them as a question, a note or a nit.
+
+### Drizzle migration numbering
+
+CI already catches it. Anything about where a migration sits in the sequence is
+out of scope, in whatever words it comes:
+
+- two PRs, or a PR and the base branch, using the same migration number or
+  file prefix such as `0123_`
+- a duplicate, skipped or out-of-order `idx`, `tag` or `when` in
+  `meta/_journal.json`
+- a snapshot `id` or `prevId` chain under `meta/` that doesn't line up
+- "needs renumbering", "regenerate after rebase", "conflicts with the migration
+  on dev"
+- a merge conflict, or `mergeable: CONFLICTING`, when the conflicting files are
+  only under `*/migrations/`
+
+What the migration SQL does is still in scope. See section 10.
+
+---
+
 ## 1. RLS lost in a Supabase-to-Drizzle port
 
 The repo is moving reads and writes off the Supabase client onto Drizzle, one
@@ -134,11 +160,8 @@ Dev Supabase has drifted from production. It has columns that production lacks,
 and `gen:types` commits them into `database.types.ts`. A type in that file doesn't
 prove the column exists in production.
 
-**Not a finding: migration number collisions.** With several PRs open, unmerged
-PRs often claim the same Drizzle migration number or `meta/_journal.json` index.
-They can collide with each other, or with a migration that landed on the base
-after the branch was cut. The author renumbers when the PR merges. Never raise
-it, at any severity, and never mention it in the summary.
+Migration numbering, the journal and snapshot ordering are on the "Never raise"
+list at the top of this file.
 
 ## 11. AI provider
 

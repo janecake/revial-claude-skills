@@ -22,11 +22,14 @@ the reasons you give for skipping a finding, your messages to the user while you
 work, and the final report. Quoted material such as code, log output and the
 reviewers' own words stays as written, and so do code identifiers.
 
-**Skip what the tripwires mark "Not a finding".** Any finding from either review
-that [`../multi-review/references/tripwires.md`](../multi-review/references/tripwires.md)
-marks "Not a finding" gets dropped without comment. Migration number collisions
-between open PRs are one example. Don't apply a fix for one, don't list it as
-skipped, and don't mention it in the report.
+**Drop everything on the "Never raise" list.** The list sits at the top of
+[`../multi-review/references/tripwires.md`](../multi-review/references/tripwires.md).
+Read it before you read either review. `/code-review` never sees that file, so
+its findings need this filter most. Drizzle migration numbering is one example:
+a shared number, journal or snapshot order, or a conflict confined to
+`*/migrations/`. Drop any finding on a listed topic whatever its severity. Don't
+apply a fix for one, don't list it as skipped, and don't mention it in the
+report.
 
 ## 1. Create the PR against dev
 
