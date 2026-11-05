@@ -74,7 +74,7 @@ Pushes the branch, opens a PR against `dev`, runs `multi-review` and re-reviews
 the fixes. It then runs the built-in `/code-review` over whatever is left, and
 checks CI before it reports anything as green. It writes the PR body, commit
 messages and its report in the same unslop style as `multi-review`, and it drops
-any finding that `tripwires.md` marks "Not a finding".
+any finding on the "Never raise" list at the top of `tripwires.md`.
 
 ### `pr-stack-announce`
 
@@ -107,8 +107,10 @@ pattern that would have caught it, and the severity. If nobody could act on an
 entry from a diff alone, it doesn't belong there.
 
 Noise goes in the same file. When reviews keep raising something you never want
-to see, add a "Not a finding" paragraph to the relevant section. Reviewers skip
-those, and the merge step drops any that get through.
+to see, add an entry to the "Never raise" section at the top. List the wordings
+it shows up in, not just its name, because a reviewer will rephrase a topic the
+entry doesn't name. Every step applies the list: reviewers, verifiers, the merge
+step, preflight and the re-review.
 
 ## Writing rules
 
