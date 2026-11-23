@@ -1,8 +1,9 @@
 # Revial Claude Code skills
 
-Three Claude Code skills for the PR workflow on [`revial-sst`](https://github.com/Revial-ai/revial-sst).
-One opens a PR, one reviews it with specialist agents running in parallel, and
-one writes a Slack post that announces a stack of PRs.
+Four Claude Code skills for the PR workflow on [`revial-sst`](https://github.com/Revial-ai/revial-sst).
+One opens a PR, one reviews it with specialist agents running in parallel, one
+works through a review that requested changes, and one writes a Slack post that
+announces a stack of PRs.
 
 The skills are plain Markdown. Claude reads a skill when its description matches
 your request, so there is nothing to build or run.
@@ -75,6 +76,23 @@ the fixes. It then runs the built-in `/code-review` over whatever is left, and
 checks CI before it reports anything as green. It writes the PR body, commit
 messages and its report in the same unslop style as `multi-review`, and it drops
 any finding on the "Never raise" list at the top of `tripwires.md`.
+
+### `pr-magic`
+
+```
+pr-magic 4313
+```
+
+For your own PR after a review requested changes. It reads every comment that
+still needs an answer, from inline threads, review bodies and the conversation.
+It applies the fixes, merges the PR's base branch in and replies to each comment
+with the commit that fixed it. Then it gets CI green and asks the reviewers to
+look again.
+
+It asks you before it pushes back on a reviewer. Everything else posts without a
+check. It never rebases or force-pushes, because the replies point at commit
+SHAs. A check that is also red on `dev` gets one re-run, and if it fails again
+the skill reports it as pre-existing.
 
 ### `pr-stack-announce`
 
