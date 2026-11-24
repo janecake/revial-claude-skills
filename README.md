@@ -77,6 +77,11 @@ checks CI before it reports anything as green. It writes the PR body, commit
 messages and its report in the same unslop style as `multi-review`, and it drops
 any finding on the "Never raise" list at the top of `tripwires.md`.
 
+A branch that builds on another open PR opens against that PR's branch, and the
+body of every PR in the stack lists the merge order. Code comments and the PR
+body describe the code as it is now: no history of how it got there, and no
+notes about approaches that were tried and dropped.
+
 ### `pr-magic`
 
 ```
@@ -93,6 +98,10 @@ It asks you before it pushes back on a reviewer. Everything else posts without a
 check. It never rebases or force-pushes, because the replies point at commit
 SHAs. A check that is also red on `dev` gets one re-run, and if it fails again
 the skill reports it as pre-existing.
+
+After the replies it brings the PR body up to date. It rewrites any part a fix
+made wrong, and adds or refreshes the stack order on a stacked PR. Its code
+comments follow the same no-history rule as `pr-review-loop`.
 
 ### `pr-stack-announce`
 
@@ -114,7 +123,7 @@ also names a few Revial checks, such as RLS on Drizzle ports and replay-registry
 classes, so edit those rows too. The `conventions` reviewer reads the target
 repo's `CLAUDE.md` fresh on each run, so it never goes stale.
 
-`pr-review-loop` assumes a `dev` base branch, and `pr-stack-announce` excludes
+`pr-review-loop` assumes a `dev` base branch for a PR that isn't stacked, and `pr-stack-announce` excludes
 Drizzle snapshot paths. Each is a one-line change.
 
 ## Keeping the tripwires current

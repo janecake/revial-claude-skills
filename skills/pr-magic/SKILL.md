@@ -27,6 +27,24 @@ words stay as written.
 every rule there applies: the 300-line cap, tests for new behaviour, Drizzle for
 new queries, `errFields(err)` for error logs, Bash timeouts.
 
+**Code comments and the PR body describe the code as it is now.** Git holds the
+history, so neither of them tells it.
+
+- No history in comments. Don't write "previously", "used to", "changed from X
+  to Y", "now uses", "after the fix", "per review" or a ticket's back story. A
+  comment says what the code does and why. The reply on the PR is where you say
+  what changed.
+- No notes about approaches you dropped. When you try a fix, it fails and you
+  write something else, the new code gets no comment saying it doesn't do the
+  first thing. The reader never saw the first attempt and nobody asked for it.
+- Say what the code doesn't do only when a reader would expect it to and the
+  gap is a deliberate decision. Then give the reason in one line. This is not a
+  ban on every "doesn't": it is a ban on contrasting the code with an attempt
+  nobody asked for.
+- The PR body follows the same rules. Step 6 covers when to edit it.
+- Before each push, read the comments you added (`git diff origin/<base>...`)
+  and cut any line that breaks these rules.
+
 **Never rewrite published history.** No rebase, no amend of a pushed commit, no
 force push. The reviewer reads the PR commit by commit, and the replies point at
 commit SHAs that must stay valid.
@@ -146,6 +164,27 @@ How to word each reply:
   Say what would change your mind if that is useful.
 
 Don't resolve threads. The reviewer resolves them.
+
+Then read the PR body against the branch as it stands and fix it with
+`gh pr edit <n> --body-file <file>` where it no longer matches:
+
+- If a fix changed what the PR does, rewrite the affected part to describe the
+  PR as it is now. Don't add a "changes since review" section, a list of review
+  rounds or the approaches you dropped. The replies and the commits carry that.
+- If the PR is part of a stack (its base is another PR's branch, or another
+  open PR's base is its branch), the body starts with the stack order, bottom
+  first, which is the order they merge in:
+
+  ```markdown
+  ## Stack
+  Merge in this order:
+  1. #4301 <title>
+  2. #4302 <title> (this PR)
+  3. #4303 <title>
+  ```
+
+  Add the list if it is missing. If a PR in the stack merged or a new one
+  joined, update the list in every open PR of the stack.
 
 ## 7. Get CI green
 

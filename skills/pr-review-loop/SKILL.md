@@ -31,6 +31,28 @@ a shared number, journal or snapshot order, or a conflict confined to
 apply a fix for one, don't list it as skipped, and don't mention it in the
 report.
 
+**Code comments and the PR body describe the code as it is now.** Git holds the
+history, so neither of them tells it.
+
+- No history in comments. Don't write "previously", "used to", "changed from X
+  to Y", "now uses", "after the fix", "per review" or a ticket's back story. A
+  comment says what the code does and why.
+- No notes about approaches you dropped. When you try something, it fails and
+  you write something else, the new code gets no comment saying it doesn't do
+  the first thing. The reader never saw the first attempt and nobody asked for
+  it.
+- Say what the code doesn't do only when a reader would expect it to and the
+  gap is a deliberate decision. Then give the reason in one line. This is not a
+  ban on every "doesn't": it is a ban on contrasting the code with an attempt
+  nobody asked for.
+- The PR body follows the same rules. It describes the change as it lands, not
+  the path there: no tried-and-reverted approaches and no log of review rounds.
+  A "not in this PR" line belongs only where a reviewer would otherwise expect
+  the work, such as something the ticket asks for or an obvious neighbouring
+  fix. Give the reason with it.
+- Before each push, read the comments you added (`git diff origin/<base>...`)
+  and cut any line that breaks these rules.
+
 ## 1. Create the PR against dev
 
 - Check that you are not on `dev`. If you are, stop and tell the user there is
@@ -42,9 +64,28 @@ report.
   `git add <dir>` can sweep in another session's edits. Stage explicit paths and
   compare them against a list of what you meant to change.
 - Push the branch with `git push -u origin HEAD`.
-- Open the PR with `gh pr create --base dev --fill`. If `--fill` gives a thin
-  title or body, write them from the diff instead. End the body with the Claude
-  Code attribution line.
+- Check whether the branch is part of a stack: it builds on another open PR's
+  branch, or another open PR builds on it. List the open PRs with
+  `gh pr list --state open --json number,title,headRefName,baseRefName` and test
+  each candidate parent with `git merge-base --is-ancestor`. A stacked branch
+  opens against its parent's branch, not `dev`, so its diff shows only its own
+  changes.
+- Open the PR with `gh pr create --base <dev or parent> --fill`. If `--fill`
+  gives a thin title or body, write them from the diff instead. End the body
+  with the Claude Code attribution line.
+- For a stacked PR, start the body with the stack order, bottom of the stack
+  first, which is the order they merge in:
+
+  ```markdown
+  ## Stack
+  Merge in this order:
+  1. #4301 <title>
+  2. #4302 <title> (this PR)
+  3. #4303 <title>
+  ```
+
+  Then update the body of every other PR in the stack with
+  `gh pr edit <n> --body-file <file>` so they all show the same list.
 - The body's verification section must point at an automated test, not at a list
   of commands you ran. If the change is testable in CI and has no test, write the
   test before you open the PR. The review would flag it anyway.
